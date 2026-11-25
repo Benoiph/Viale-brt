@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Viale BRT — Protótipo 2D</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#17212b;color:#fff;font-family:system-ui,Arial;touch-action:none}
+#game{display:block;width:100vw;height:100dvh;background:#83b9d2}
+#hud{position:fixed;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.pill{background:#101820d9;border:1px solid #ffffff40;border-radius:12px;padding:8px 11px;font-weight:700;font-size:13px}
+#controls{position:fixed;bottom:12px;left:0;right:0;display:flex;justify-content:space-between;align-items:end;padding:0 12px;gap:8px}
+.cluster{display:flex;gap:8px;align-items:end}.btn{border:1px solid #ffffff70;background:#142331eF;color:white;border-radius:14px;min-width:58px;height:58px;font-size:13px;font-weight:800;padding:6px;box-shadow:0 3px 0 #0005;touch-action:none}
+.btn:active,.btn.active{background:#e18b25}.pedal{height:76px;min-width:68px;background:#176a45}.brake{background:#9a3030}
+#topbuttons{position:fixed;top:52px;right:8px;display:flex;gap:6px}.small{height:40px;min-width:64px;font-size:11px}
+@media (orientation:portrait){#rotate{display:block}}#rotate{display:none;position:fixed;inset:0;background:#111e;z-index:10;text-align:center;padding:35vh 25px;font-weight:700}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"><div class="pill">🚌 MARCOPOLO VIALE BRT</div><div class="pill"><span id="speed">0</span> km/h</div></div>
+<div id="topbuttons"><button class="btn small" id="camera">CÂMERA</button><button class="btn small" id="doors">PORTAS: FECH.</button><button class="btn small" id="signal">SETA: OFF</button></div>
+<div id="controls">
+ <div class="cluster"><button class="btn" id="left">◀<br>ESQ.</button><button class="btn" id="right">▶<br>DIR.</button></div>
+ <div class="cluster"><button class="btn brake pedal" id="brake">FREIO</button><button class="btn pedal" id="gas">ACELERAR</button></div>
+</div>
+<div id="rotate">Gire o iPhone para a horizontal para dirigir o ônibus.</div>
+<script>
+(()=>{const c=document.getElementById('game'),ctx=c.getContext('2d');let w,h,dpr,spd=0,steer=0,road=0,cam=0,doors=false,signal=0,blink=0;
+function resize(){dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;c.width=w*dpr;c.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
+const held={};function hold(id,key){let e=document.getElementById(id);e.addEventListener('pointerdown',ev=>{ev.preventDefault();held[key]=true;e.classList.add('active')});['pointerup','pointercancel','pointerleave'].forEach(t=>e.addEventListener(t,()=>{held[key]=false;e.classList.remove('active')}))}
+hold('gas','gas');hold('brake','brake');hold('left','left');hold('right','right');
+document.getElementById('camera').onclick=()=>cam=1-cam;
+document.getElementById('doors').onclick=()=>{doors=!doors;document.getElementById('doors').textContent='PORTAS: '+(doors?'ABERTAS':'FECH.')};
+document.getElementById('signal').onclick=()=>{signal=(signal+1)%3;document.getElementById('signal').textContent='SETA: '+(['OFF','ESQ.','DIR.'][signal])};
+function rounded(x,y,ww,hh,r,col){ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(x,y,ww,hh,r);ctx.fill()}
+function bus(x,y,s){ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+ // body and articulated rear section
+ rounded(-145,-35,190,70,12,'#f1f3f4');rounded(48,-35,118,70,12,'#f1f3f4');
+ ctx.fillStyle='#0873a8';ctx.fillRect(-140,-29,180,18);ctx.fillRect(53,-29,108,18);
+ ctx.fillStyle='#9bd5e8';for(let i=0;i<5;i++)ctx.fillRect(-128+i*34,-25,27,13);for(let i=0;i<3;i++)ctx.fillRect(62+i*32,-25,25,13);
+ ctx.fillStyle='#202a30';ctx.fillRect(41,-32,10,64);ctx.fillStyle='#333';ctx.fillRect(43,-28,6,56);
+ ctx.fillStyle='#dce4e8';ctx.fillRect(-135,4,290,5);ctx.fillStyle='#f7c843';ctx.fillRect(-135,28,290,4);
+ for(let xw of [-105,-5,90,145]){ctx.fillStyle='#141a20';ctx.beginPath();ctx.arc(xw,35,13,0,7);ctx.fill();ctx.fillStyle='#aeb8be';ctx.beginPath();ctx.arc(xw,35,6,0,7);ctx.fill()}
+ if(doors){ctx.strokeStyle='#f4d35e';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-40,-9);ctx.lineTo(-40,25);ctx.moveTo(-24,-9);ctx.lineTo(-24,25);ctx.stroke()}
+ ctx.fillStyle='#fff';ctx.font='bold 11px Arial';ctx.fillText('VIALE BRT',-115,20);ctx.restore()}
+function draw(){let dt=1/60; if(held.gas)spd=Math.min(85,spd+26*dt);else spd=Math.max(0,spd-4*dt);if(held.brake)spd=Math.max(0,spd-65*dt);
+ steer=(held.left?-1:0)+(held.right?1:0);road+=spd*.10;blink+=dt;
+ ctx.clearRect(0,0,w,h);ctx.fillStyle='#80b9d1';ctx.fillRect(0,0,w,h*.48);ctx.fillStyle='#6d9c62';ctx.fillRect(0,h*.48,w,h*.52);
+ // city silhouettes
+ for(let i=0;i<12;i++){let bx=((i*137-road*.15)%(w+100)+w+100)%(w+100)-50;let bh=45+(i*29)%95;ctx.fillStyle=['#87949a','#a3a9a5','#71848a'][i%3];ctx.fillRect(bx,h*.48-bh,65,bh);ctx.fillStyle='#f4d27b';for(let yy=h*.48-bh+12;yy<h*.48-8;yy+=20)for(let xx=bx+10;xx<bx+58;xx+=19)ctx.fillRect(xx,yy,7,9)}
+ ctx.fillStyle='#45494d';ctx.beginPath();ctx.moveTo(w*.18,h);ctx.lineTo(w*.36,h*.46);ctx.lineTo(w*.64,h*.46);ctx.lineTo(w*.82,h);ctx.fill();
+ ctx.strokeStyle='#f5f0cf';ctx.lineWidth=3;ctx.setLineDash([25,22]);ctx.lineDashOffset=-road;ctx.beginPath();ctx.moveTo(w/2,h);ctx.lineTo(w/2,h*.46);ctx.stroke();ctx.setLineDash([]);
+ if(cam===0){let x=w/2+steer*25,y=h*.70;bus(x,y,Math.min(1.1,w/600));}
+ else {ctx.fillStyle='#18252c';ctx.fillRect(w*.12,h*.52,w*.76,h*.39);ctx.fillStyle='#8fc5d8';ctx.fillRect(w*.16,h*.55,w*.68,h*.23);ctx.fillStyle='#303a40';ctx.fillRect(w*.12,h*.78,w*.76,h*.13);ctx.fillStyle='#222';ctx.fillRect(w*.38,h*.78,w*.24,h*.11);ctx.fillStyle='#f4f4f4';ctx.font='bold 18px Arial';ctx.fillText('PAINEL DO VIALE BRT',w*.29,h*.84);ctx.fillStyle='#72e0a0';ctx.font='bold 24px Arial';ctx.fillText(Math.round(spd)+' km/h',w*.43,h*.75)}
+ if(signal&&Math.floor(blink*2)%2===0){ctx.fillStyle='#ffca28';ctx.beginPath();ctx.arc(signal===1?24:w-24, h*.68,9,0,7);ctx.fill()}
+ document.getElementById('speed').textContent=Math.round(spd);requestAnimationFrame(draw)}
+draw();
+})();
+</script>
+</body></html>
